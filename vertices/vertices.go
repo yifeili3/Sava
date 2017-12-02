@@ -46,22 +46,6 @@ type Vertex interface {
 	MutableValue(in interface{})
 }
 
-//NewVertex ...
-func NewVertex(id int, workerid int) *BaseVertex {
-	v := &BaseVertex{
-		ID:                 id,
-		WorkerID:           workerid,
-		SuperStep:          0,
-		EdgeList:           make([]Edge, 0),
-		IncomingMsgCurrent: make([]util.WorkerMessage, 0),
-		IncomingMsgNext:    make([]util.WorkerMessage, 0),
-		OutgoingMsg:        make([]util.WorkerMessage, 0),
-		Partition:          make([]util.MetaInfo, 0),
-		IsActive:           true,
-	}
-	return v
-}
-
 //GetVertexID ...
 func (v *BaseVertex) GetVertexID() int {
 	return v.ID

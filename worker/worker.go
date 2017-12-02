@@ -5,9 +5,11 @@ import (
 	"Sava/vertices"
 	"bufio"
 	"encoding/json"
+	"io"
 	"log"
 	"net"
 	"os"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -17,6 +19,7 @@ const (
 	udpSender      = 4000
 	workerListener = 4002
 	masterListener = 4004
+	fileBase       = "/home/yifeili3/sava/"
 )
 
 type master struct {
@@ -158,19 +161,46 @@ func (w *Worker) WorkerTaskListener() {
 				w.networkMessageReceiver(msg)
 			case "JOB": // Job message
 				log.Println("Receive Job Message")
-				//msg.FileName
-				// Read Partition
-				// arr:=
-				numVertices := 0
-				/*
-					for i := 0; i < len(msg.Partition); i++ {
-						if msg.Partition[i].ID == w.ID {
-							part := msg.Partition[i]
-						}
-					}
-				*/
 				baseVertices := make(map[int]vertices.BaseVertex)
-				// load vertices in map
+
+				file, err := os.OpenFile(fileBase+msg.FileName, os.O_RDONLY, 0666)
+				if err != nil {
+					log.Println(err)
+				}
+				defer file.Close()
+				br := bufio.NewReader(file)
+				numVertices := 0
+				for {
+					a, _, err := br.ReadLine()
+					if err == io.EOF {
+						break
+					}
+					line := string(a)
+					src := strings.Split(line, " ")[0]
+					dest := strings.Split(line, " ")[1]
+					log.Println(src + " " + dest)
+					srcNode, _ := strconv.Atoi(src)
+					destNode, _ := strconv.Atoi(dest)
+
+					if v, ok := baseVertices[srcNode]; ok {
+						v.EdgeList = append(v.EdgeList, vertices.Edge{DestVertex: destNode, EdgeValue: 1})
+					} else {
+						baseVertices[srcNode] = vertices.BaseVertex{
+							ID:                 srcNode,
+							WorkerID:           w.ID,
+							SuperStep:          0,
+							EdgeList:           make([]vertices.Edge, 0),
+							IncomingMsgCurrent: make([]util.WorkerMessage, 0),
+							IncomingMsgNext:    make([]util.WorkerMessage, 0),
+							OutgoingMsg:        make([]util.WorkerMessage, 0),
+							Partition:          make([]util.MetaInfo, 0),
+							IsActive:           true,
+						}
+						v := baseVertices[srcNode]
+						v.EdgeList = append(v.EdgeList, vertices.Edge{DestVertex: destNode, EdgeValue: 1})
+						numVertices++
+					}
+				}
 
 				switch msg.JobName {
 				case "PageRank":
@@ -183,12 +213,19 @@ func (w *Worker) WorkerTaskListener() {
 					}
 					w.VertexMap = prvMap
 				case "SSSP":
-					//w.VertexMap =
+
 				default:
 					log.Println("Unknown operation")
 				}
-				//**********************************
-				// TODO:initialize vertices
+
+				ack := util.Message{MsgType: "ACK"}
+				buf := util.FormatWorkerMessage(ack)
+				for i := 0; i < 2; i++ {
+					srcAddr := net.UDPAddr{IP: w.Addr.IP, Port: udpSender}
+					destAddr := w.MasterList[i].Addr
+					util.SendMessage(&srcAddr, &destAddr, buf)
+				}
+
 				go w.localMessageProcessor()
 			case "SUPERSTEP": // Superstep msg
 				if !w.checkHalt() {
