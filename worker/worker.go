@@ -81,6 +81,7 @@ func (w *Worker) HandleInput() {
 		switch cmd[0] {
 		case "JOIN":
 			w.HasStart = true
+			w.join()
 		case "RUNJOB":
 			jobName := cmd[1]
 			dataFile := cmd[2]
@@ -88,6 +89,16 @@ func (w *Worker) HandleInput() {
 		default:
 			continue
 		}
+	}
+}
+
+func (w *Worker) join() {
+	join := util.Message{MsgType: "JOIN"}
+	buf := util.FormatWorkerMessage(join)
+	for i := 0; i < 2; i++ {
+		srcAddr := net.UDPAddr{IP: w.Addr.IP, Port: udpSender}
+		destAddr := w.MasterList[i].Addr
+		util.SendMessage(&srcAddr, &destAddr, buf)
 	}
 }
 
@@ -140,6 +151,8 @@ func (w *Worker) WorkerTaskListener() {
 			}
 
 			switch msg.MsgType {
+			case "CONFIRMJOIN":
+				log.Println("Receive Confirmjoin Message")
 			case "V2V": // Vertex message
 				log.Println("Receive Vertex Message")
 				w.networkMessageReceiver(msg)
@@ -173,7 +186,6 @@ func (w *Worker) WorkerTaskListener() {
 					//w.VertexMap =
 				default:
 					log.Println("Unknown operation")
-
 				}
 				//**********************************
 				// TODO:initialize vertices
