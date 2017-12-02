@@ -129,7 +129,8 @@ func RPCPutFile(targetID int, localFileName string, filetype string) {
 	var reply string
 	n.ReadLocalFile(localFileName, &reply)
 	// parse the localFileName string
-	filename := localFileName[strings.LastIndex(localFileName, "/"):]
+	log.Println(strings.LastIndex(localFileName, "/"))
+	filename := localFileName[strings.LastIndex(localFileName, "/")+1:]
 	var remotefilename string
 	if filetype == "data" {
 		remotefilename = baseFilepath + "data/" + filename

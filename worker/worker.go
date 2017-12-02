@@ -106,7 +106,7 @@ func (w *Worker) join() {
 func (w *Worker) RequestJob(jobName string, filePath string) {
 	for i := range w.MasterList {
 		MasterID := w.MasterList[i].ID
-		util.RPCPutFile(MasterID, jobName, "job")
+		//util.RPCPutFile(MasterID, jobName, "job")
 		util.RPCPutFile(MasterID, filePath, "data")
 		// send message to master and ask to start job
 		b := util.FormatMessage(jobName, filePath)
@@ -158,7 +158,7 @@ func (w *Worker) WorkerTaskListener() {
 				w.networkMessageReceiver(msg)
 			case "JOB": // Job message
 				log.Println("Receive Job Message")
-
+				//msg.FileName
 				// Read Partition
 				// arr:=
 				numVertices := 0
