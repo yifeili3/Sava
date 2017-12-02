@@ -1,0 +1,42 @@
+sshfs yifeili3@fa17-cs425-g54-01.cs.illinois.edu:/home/yifeili3/ /mnt/ssh/
+scp /mnt/ssh/go/src/Membership/util/util.go yifeili3@fa17-cs425-g54-02.cs.illinois.edu:/home/yifeili3/go/src/Membership/util/
+
+scp /mnt/ssh/go/src/Membership/daemon/daemon.go yifeili3@fa17-cs425-g54-02.cs.illinois.edu:/home/yifeili3/go/src/Membership/daemon/;
+scp /mnt/ssh/go/src/Membership/daemon/daemon.go yifeili3@fa17-cs425-g54-03.cs.illinois.edu:/home/yifeili3/go/src/Membership/daemon/;
+scp /mnt/ssh/go/src/Membership/daemon/daemon.go yifeili3@fa17-cs425-g54-04.cs.illinois.edu:/home/yifeili3/go/src/Membership/daemon/;
+scp /mnt/ssh/go/src/Membership/daemon/daemon.go yifeili3@fa17-cs425-g54-05.cs.illinois.edu:/home/yifeili3/go/src/Membership/daemon/;
+scp /mnt/ssh/go/src/Membership/daemon/daemon.go yifeili3@fa17-cs425-g54-06.cs.illinois.edu:/home/yifeili3/go/src/Membership/daemon/
+
+cd SDFS
+
+go build -o ../../pkg/SDFS/member.a member/member.go
+go build -o ../../pkg/SDFS/util.a util/util.go
+go build -o ../../pkg/SDFS/daemon.a daemon/daemon.go
+go build -o ../../pkg/SDFS/shareReadWrite.a shareReadWrite/nodefunc.go
+go build -o ../../pkg/SDFS/master.a master/master.go
+clear
+go run main.go
+
+
+git clone https://gitlab.engr.illinois.edu/CS425Group54/Membership.git
+
+go run backserver.go &
+
+cp /mnt/ssh/m1/go/src/Membership/daemon/daemon.go /mnt/ssh/m2/go/src/Membership/daemon/daemon.go
+cp /mnt/ssh/m1/go/src/Membership/daemon/daemon.go /mnt/ssh/m3/go/src/Membership/daemon/daemon.go
+cp /mnt/ssh/m1/go/src/Membership/daemon/daemon.go /mnt/ssh/m4/go/src/Membership/daemon/daemon.go
+cp /mnt/ssh/m1/go/src/Membership/daemon/daemon.go /mnt/ssh/m5/go/src/Membership/daemon/daemon.go
+cp /mnt/ssh/m1/go/src/Membership/daemon/daemon.go /mnt/ssh/m6/go/src/Membership/daemon/daemon.go
+cp /mnt/ssh/m1/go/src/Membership/daemon/daemon.go /mnt/ssh/m7/go/src/Membership/daemon/daemon.go
+cp /mnt/ssh/m1/go/src/Membership/daemon/daemon.go /mnt/ssh/m8/go/src/Membership/daemon/daemon.go
+cp /mnt/ssh/m1/go/src/Membership/daemon/daemon.go /mnt/ssh/m9/go/src/Membership/daemon/daemon.go
+cp /mnt/ssh/m1/go/src/Membership/daemon/daemon.go /mnt/ssh/m10/go/src/Membership/daemon/daemon.go
+
+
+cp /mnt/ssh/m1/go/src/Membership/util/util.go /mnt/ssh/m2/go/src/Membership/util/util.go
+
+cd go/src/
+git clone https://github.com/yifeili3/SDFS.git
+
+
+PUT /home/yifeili3/local/data.txt

@@ -59,6 +59,7 @@ func NewWorker() (worker *Worker, err error) {
 		ID:         serverID,
 		SuperStep:  1,
 		HasStart:   false,
+		MasterList: make([]Master, 2),
 	}
 	for i := 0; i < 2; i++ {
 		worker.MasterList[i] = master{
@@ -116,8 +117,9 @@ func (w *Worker) HeartBeat() {
 			heartbeat := util.Message{MsgType: "HEARTBEAT"}
 			buf := util.FormatWorkerMessage(heartbeat)
 			for i := 0; i < 2; i++ {
+				srcAddr := net.UDPAddr{IP: w.Addr.IP, Port: udpSender}
 				destAddr := w.MasterList[i].Addr
-				util.SendMessage(&w.Addr, &destAddr, buf)
+				util.SendMessage(&srcAddr, &destAddr, buf)
 			}
 		}
 		time.Sleep(time.Millisecond * 100)
