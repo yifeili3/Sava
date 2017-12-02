@@ -59,7 +59,7 @@ func NewWorker() (worker *Worker, err error) {
 		ID:         serverID,
 		SuperStep:  1,
 		HasStart:   false,
-		MasterList: make([]Master, 2),
+		MasterList: make([]master, 2),
 	}
 	for i := 0; i < 2; i++ {
 		worker.MasterList[i] = master{
