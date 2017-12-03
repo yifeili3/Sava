@@ -41,6 +41,7 @@ type Worker struct {
 	HasStart   bool
 	MasterList []master
 	MsgChan    chan util.WorkerMessage
+	Partition  []util.MetaInfo
 }
 
 //NewWorker ...
@@ -151,14 +152,15 @@ func (w *Worker) HeartBeat() {
 				util.SendMessage(&srcAddr, &destAddr, buf)
 			}
 		}
-		time.Sleep(time.Millisecond * 100)
+		time.Sleep(time.Millisecond * 5000)
 	}
 }
 
 func (w *Worker) WorkerMessageListener() {
-	buf := make([]byte, 8192)
+	buf := make([]byte, 15000000)
 	for {
-		n, _, _ := w.Connection[1].ReadFromUDP(buf)
+		n, remoteAddr, _ := w.Connection[1].ReadFromUDP(buf)
+		//log.Printf("messagerListener in %d\n", n)
 		if n != 0 {
 			// process message
 			var msg util.Message
@@ -170,6 +172,22 @@ func (w *Worker) WorkerMessageListener() {
 			case "V2V": // Vertex message
 				//log.Println("Receive Vertex Message")
 				w.networkMessageReceiver(msg)
+			case "W2W":
+				log.Println("W2W")
+				w.PartWorkerMsg(msg)
+				for i := range w.MasterList {
+					msg := util.Message{
+						MsgType:   "W2WREV",
+						SuperStep: w.SuperStep,
+						TargetID:  util.CalculateID(remoteAddr.IP.String()),
+					}
+					b, _ := json.Marshal(msg)
+					targetAddr := net.UDPAddr{
+						IP:   w.MasterList[i].Addr.IP,
+						Port: masterListener,
+					}
+					util.UDPSend(&targetAddr, b)
+				}
 			default:
 				log.Println("error")
 			}
@@ -179,12 +197,31 @@ func (w *Worker) WorkerMessageListener() {
 	}
 }
 
+func (w *Worker) PartWorkerMsg(msg util.Message) {
+	for i := range msg.PoolWorkerMsg {
+		workmsg := msg.PoolWorkerMsg[i]
+		// this is a list of metaInfos of a single vertex of that worker
+		if w.SuperStep == msg.SuperStep {
+			log.Printf("The pool message is %d %d %f\n ", workmsg.DestVertex, workmsg.MessageValue.(float64))
+			if v, ok := w.VertexMap[workmsg.DestVertex]; ok {
+				log.Println("Enqueue message")
+				v.EnqueueMessage(workmsg)
+			} else {
+				log.Println("Network Vertex not existed")
+			}
+		}
+
+	}
+}
+
 //WorkerTaskListener ...
 func (w *Worker) WorkerTaskListener() {
 	buf := make([]byte, 8192)
 	for {
 		n, _, _ := w.Connection[0].ReadFromUDP(buf)
+		log.Printf("WokerTaskListener %d\n", n)
 		if n != 0 {
+			log.Println("TaskListener in")
 			// process message
 			var msg util.Message
 			err := json.Unmarshal(buf[0:n], &msg)
@@ -203,7 +240,7 @@ func (w *Worker) WorkerTaskListener() {
 			case "JOB": // Job message
 				log.Println("Receive Job Message")
 				baseVertices := make(map[int]*vertices.BaseVertex)
-
+				w.Partition = msg.Partition
 				file, err := os.OpenFile(fileBase+"data/"+msg.FileName, os.O_RDONLY, 0666)
 				if err != nil {
 					log.Println(err)
@@ -280,14 +317,17 @@ func (w *Worker) WorkerTaskListener() {
 				w.MsgChan = make(chan util.WorkerMessage)
 				w.runSuperStep(SuperstepNum, w.MsgChan)
 				// at end of superstep, send message to master
+				// wait for a while and send msg to master
+				//time.Sleep(time.Millisecond * 2000)
 				if !w.checkHalt() {
-					superstep := util.Message{MsgType: "SUPERSTEPDONE", SuperStep: w.SuperStep}
-					buf := util.FormatWorkerMessage(superstep)
-					srcAddr := net.UDPAddr{IP: w.Addr.IP, Port: udpSender}
-					for i := 0; i < 2; i++ {
-						destAddr := w.MasterList[i].Addr
-						util.SendMessage(&srcAddr, &destAddr, buf)
-					}
+					/*
+						superstep := util.Message{MsgType: "SUPERSTEPDONE", SuperStep: w.SuperStep}
+						buf := util.FormatWorkerMessage(superstep)
+						srcAddr := net.UDPAddr{IP: w.Addr.IP, Port: udpSender}
+						for i := 0; i < 2; i++ {
+							destAddr := w.MasterList[i].Addr
+							util.SendMessage(&srcAddr, &destAddr, buf)
+						}*/
 				} else {
 					halt := util.Message{MsgType: "HALT"}
 					buf := util.FormatWorkerMessage(halt)
@@ -308,7 +348,9 @@ func (w *Worker) WorkerTaskListener() {
 					util.SendMessage(&srcAddr, &destAddr, buf)
 				}
 			}
+			log.Println("TaskListener out")
 		} else {
+			log.Println("TaskListener else")
 			continue
 		}
 	}
@@ -361,20 +403,70 @@ func (w *Worker) checkHalt() bool {
 }
 
 func (w *Worker) runSuperStep(Step int, MsgChan chan util.WorkerMessage) {
-	log.Println("Work: Running superstep #:", Step)
+	log.Println("\nWork: Running superstep #:", Step)
 	for _, v := range w.VertexMap {
+
 		v.UpdateMessageQueue()
 	}
 	doneChan := make(chan bool)
 	for _, v := range w.VertexMap {
 		go superStep(Step, v, doneChan, MsgChan)
 	}
+
 	for _ = range w.VertexMap {
 		<-doneChan
 	}
+
+	messageQueue := make([][]util.WorkerMessage, len(w.Partition))
 	for _, v := range w.VertexMap {
-		v.SendAllMessage()
+		messageQueue = *v.GetOutgoingMsg(messageQueue)
+		/*
+			log.Printf("V%d: ", v.GetVertexID())
+			for j := range messageQueue {
+				for k := range messageQueue[j] {
+					log.Printf("%d %d", messageQueue[j][k].DestVertex, messageQueue[j][k].SuperStep)
+				}
+			}
+			log.Println()
+		*/
+		// after get all the message of a vertex, go over another vertex
+		//v.SendAllMessage()
 	}
+	log.Println("Sending W2W")
+	// sending a bag of []util.WorkerMessage to workers
+	for i := range messageQueue {
+		//log.Println("Yo where the Fuck")
+		receiverID := w.Partition[i].ID
+		cmd := util.Message{
+			MsgType:       "W2W",
+			PoolWorkerMsg: messageQueue[i],
+			SuperStep:     w.SuperStep,
+		}
+		b, _ := json.Marshal(cmd)
+		//log.Println(len(b))
+		targetAddr := net.UDPAddr{
+			IP:   net.ParseIP(util.CalculateIP(receiverID)),
+			Port: workermsgListener,
+		}
+		util.UDPSend(&targetAddr, b)
+		//time.Sleep(time.Millisecond * 1000)
+		for i := range w.MasterList {
+			msg := util.Message{
+				MsgType:   "W2WSEND",
+				SuperStep: w.SuperStep,
+				TargetID:  receiverID,
+			}
+			b, _ := json.Marshal(msg)
+			targetAddr := net.UDPAddr{
+				IP:   w.MasterList[i].Addr.IP,
+				Port: masterListener,
+			}
+			util.UDPSend(&targetAddr, b)
+		}
+		log.Println("End sending all messages")
+		//time.Sleep(time.Millisecond * 1000)
+	}
+
 }
 
 func superStep(Step int, v vertices.Vertex, doneChan chan bool, MsgChan chan util.WorkerMessage) {
@@ -401,11 +493,14 @@ func (w *Worker) localMessageProcessor() {
 
 func (w *Worker) networkMessageReceiver(msg util.Message) {
 	workerMsg := msg.WorkerMsg
-	//log.Printf("%d %f\n ", workerMsg.DestVertex, workerMsg.MessageValue.(float64))
-	if v, ok := w.VertexMap[workerMsg.DestVertex]; ok {
-		//log.Println("Enqueue message")
-		v.EnqueueMessage(workerMsg)
-	} else {
-		//log.Println("Network Vertex not existed")
+	//log.Printf("worker's supterstep is %d, msg is %d", w.SuperStep, msg.SuperStep)
+	if w.SuperStep == msg.SuperStep {
+		//log.Printf("%d %f\n ", workerMsg.DestVertex, workerMsg.MessageValue.(float64))
+		if v, ok := w.VertexMap[workerMsg.DestVertex]; ok {
+			//log.Println("Enqueue message")
+			v.EnqueueMessage(workerMsg)
+		} else {
+			log.Println("Network Vertex not existed")
+		}
 	}
 }

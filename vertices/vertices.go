@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"log"
 	"net"
+	"sync"
 )
 
 const (
@@ -24,6 +25,7 @@ type BaseVertex struct {
 	OutgoingMsg        []util.WorkerMessage
 	Partition          []util.MetaInfo
 	IsActive           bool
+	mux                sync.Mutex
 }
 
 //Edge ...
@@ -45,6 +47,20 @@ type Vertex interface {
 	GetSuperStep() int
 	MutableValue(in interface{})
 	SendAllMessage()
+	GetOutgoingMsg(outMsg [][]util.WorkerMessage) *[][]util.WorkerMessage
+}
+
+// GetOutgoingMsg ...
+func (v *BaseVertex) GetOutgoingMsg(outMsg [][]util.WorkerMessage) *[][]util.WorkerMessage {
+	for i := 0; i < len(v.OutgoingMsg); i++ {
+		if v.OutgoingMsg[i].SuperStep != v.SuperStep {
+			continue
+		}
+		n := v.OutgoingMsg[i].DestVertex % len(v.Partition)
+		outMsg[n] = append(outMsg[n], v.OutgoingMsg[i])
+		//receiverID := v.Partition[n].ID
+	}
+	return &outMsg
 }
 
 //GetVertexID ...
@@ -84,7 +100,7 @@ func (v *BaseVertex) SendMessageTo(destVertex int, msg util.WorkerMessage, MsgCh
 	n := destVertex % len(v.Partition)
 
 	receiverID := v.Partition[n].ID
-	log.Printf("Vex %d is sending message to worker %d,destVex %d\n", v.ID, receiverID, destVertex)
+	//log.Printf("Vex %d is sending message to worker %d,destVex %d\n", v.ID, receiverID, destVertex)
 	/*
 		if receiverID == v.WorkerID {
 			log.Println("Send to local")
@@ -99,11 +115,13 @@ func (v *BaseVertex) SendMessageTo(destVertex int, msg util.WorkerMessage, MsgCh
 }
 
 func (v *BaseVertex) SendAllMessage() {
+	//log.Println(len(v.OutgoingMsg))
 	for i := 0; i < len(v.OutgoingMsg); i++ {
 		n := v.OutgoingMsg[i].DestVertex % len(v.Partition)
 		receiverID := v.Partition[n].ID
 		sendToRemote(receiverID, v.OutgoingMsg[i])
 	}
+	v.OutgoingMsg = make([]util.WorkerMessage, 0)
 }
 
 func sendToLocal(msg util.WorkerMessage, MsgChan chan util.WorkerMessage) {
@@ -111,14 +129,20 @@ func sendToLocal(msg util.WorkerMessage, MsgChan chan util.WorkerMessage) {
 }
 
 func (v *BaseVertex) sendToQueue(receiVerID int, msg util.WorkerMessage) {
+	//log.Println("ADD LOCK")
+	v.mux.Lock()
 	v.OutgoingMsg = append(v.OutgoingMsg, msg)
+	v.mux.Unlock()
+	//log.Println("Release LOCK")
+	//log.Printf("Appending msg to v.outgointmsg, value %f\n", v.OutgoingMsg[len(v.OutgoingMsg)-1].MessageValue)
 }
 
 func sendToRemote(receiverID int, msg util.WorkerMessage) {
 	// send over network
-	log.Printf("ReceiverID is %d, msg dest is %d", receiverID, msg.DestVertex)
+	//log.Printf("ReceiverID is %d, msg dest is %d", receiverID, msg.DestVertex)
 	m := util.Message{
 		MsgType:   "V2V",
+		SuperStep: msg.SuperStep,
 		WorkerMsg: msg,
 	}
 	buf, _ := json.Marshal(m)
@@ -148,22 +172,29 @@ func (v *BaseVertex) UpdateSuperstep(s int) {
 
 //EnqueueMessage ...
 func (v *BaseVertex) EnqueueMessage(in util.WorkerMessage) {
+	//log.Println("get incoming message value:%f\n", in.MessageValue)
 	v.IncomingMsgNext = append(v.IncomingMsgNext, in)
-	//log.Println(len(v.IncomingMsgNext))
+	//log.Printf("length of incomingMsgNext is %d\n", len(v.IncomingMsgNext))
 }
 
 // UpdateMessageQueue ...need to update status of each vertex
 func (v *BaseVertex) UpdateMessageQueue() {
+	//log.Println("Print incomingmsgCurrent")
+
 	// move message from S+1 to S
-	v.IncomingMsgCurrent = make([]util.WorkerMessage, len(v.IncomingMsgNext))
+	v.IncomingMsgCurrent = make([]util.WorkerMessage, 0)
 	for i := 0; i < len(v.IncomingMsgNext); i++ {
 		// need deep copy????
-		v.IncomingMsgCurrent[i] = v.IncomingMsgNext[i]
-		//log.Println("incoming message from:" + strconv.FormatFloat(v.IncomingMsgCurrent[i].MessageValue.(float64), 'f', 6, 64))
+		if v.SuperStep == v.IncomingMsgNext[i].SuperStep {
+			v.IncomingMsgCurrent = append(v.IncomingMsgCurrent, v.IncomingMsgNext[i])
+			//log.Println("incoming message from:" + strconv.FormatFloat(v.IncomingMsgCurrent[i].MessageValue.(float64), 'f', 6, 64))
+		}
+
 	}
-	v.IncomingMsgNext = nil
+	v.IncomingMsgNext = make([]util.WorkerMessage, 0)
 	// vote to halt, but message comes in
 	if v.IsActive == false && len(v.IncomingMsgCurrent) > 0 {
+		log.Println("Should stop at 2")
 		v.IsActive = true
 	}
 }

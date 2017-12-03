@@ -20,13 +20,15 @@ const (
 
 // Message ...
 type Message struct {
-	MsgType   string // Start/Superstep/W2W/JOB
-	SuperStep int
-	JobName   string
-	Partition []MetaInfo
-	FileName  string
-	WorkerMsg WorkerMessage
-	NumVertex int
+	MsgType       string // Start/Superstep/W2W/JOB / W2WSEND / W2WREV
+	SuperStep     int
+	JobName       string
+	Partition     []MetaInfo
+	FileName      string
+	WorkerMsg     WorkerMessage
+	PoolWorkerMsg []WorkerMessage
+	NumVertex     int
+	TargetID      int
 }
 
 //WorkerMessage ...
@@ -34,6 +36,7 @@ type WorkerMessage struct {
 	DestVertex   int
 	MessageValue interface{}
 	SuperStep    int
+	FormVertex   int
 }
 
 //MetaInfo ...

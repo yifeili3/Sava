@@ -13,10 +13,11 @@ func main(){
         return
     }
 
-    go Worker.HeartBeat()
+    
     go Worker.HandleInput()
     go Worker.WorkerMessageListener()
-    Worker.WorkerTaskListener()
+    go Worker.WorkerTaskListener()
+    Worker.HeartBeat()
     
     
 }
