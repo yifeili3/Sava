@@ -52,7 +52,7 @@ type Vertex interface {
 
 // GetOutgoingMsg ...
 func (v *BaseVertex) GetOutgoingMsg(outMsg [][]util.WorkerMessage) *[][]util.WorkerMessage {
-	for i := 0; i < len(v.OutgoingMsg); i++ {
+	for i := 0; i < len(v.OutgoingMsg)/2; i++ {
 		if v.OutgoingMsg[i].SuperStep != v.SuperStep {
 			continue
 		}

@@ -420,52 +420,39 @@ func (w *Worker) runSuperStep(Step int, MsgChan chan util.WorkerMessage) {
 	messageQueue := make([][]util.WorkerMessage, len(w.Partition))
 	for _, v := range w.VertexMap {
 		messageQueue = *v.GetOutgoingMsg(messageQueue)
-		/*
-			log.Printf("V%d: ", v.GetVertexID())
-			for j := range messageQueue {
-				for k := range messageQueue[j] {
-					log.Printf("%d %d", messageQueue[j][k].DestVertex, messageQueue[j][k].SuperStep)
-				}
-			}
-			log.Println()
-		*/
-		// after get all the message of a vertex, go over another vertex
-		//v.SendAllMessage()
 	}
 	log.Println("Sending W2W")
 	// sending a bag of []util.WorkerMessage to workers
 	for i := range messageQueue {
 		//log.Println("Yo where the Fuck")
-		if i < len(messageQueue)/3 {
-			receiverID := w.Partition[i].ID
-			cmd := util.Message{
-				MsgType:       "W2W",
-				PoolWorkerMsg: messageQueue[i],
-				SuperStep:     w.SuperStep,
+		receiverID := w.Partition[i].ID
+		cmd := util.Message{
+			MsgType:       "W2W",
+			PoolWorkerMsg: messageQueue[i],
+			SuperStep:     w.SuperStep,
+		}
+		b, _ := json.Marshal(cmd)
+		log.Println(len(b))
+		targetAddr := net.UDPAddr{
+			IP:   net.ParseIP(util.CalculateIP(receiverID)),
+			Port: workermsgListener,
+		}
+		util.UDPSend(&targetAddr, b)
+		//time.Sleep(time.Millisecond * 1000)
+		for i := range w.MasterList {
+			msg := util.Message{
+				MsgType:   "W2WSEND",
+				SuperStep: w.SuperStep,
+				TargetID:  receiverID,
 			}
-			b, _ := json.Marshal(cmd)
-			log.Println(len(b))
+			b, _ := json.Marshal(msg)
 			targetAddr := net.UDPAddr{
-				IP:   net.ParseIP(util.CalculateIP(receiverID)),
-				Port: workermsgListener,
+				IP:   w.MasterList[i].Addr.IP,
+				Port: masterListener,
 			}
 			util.UDPSend(&targetAddr, b)
-			//time.Sleep(time.Millisecond * 1000)
-			for i := range w.MasterList {
-				msg := util.Message{
-					MsgType:   "W2WSEND",
-					SuperStep: w.SuperStep,
-					TargetID:  receiverID,
-				}
-				b, _ := json.Marshal(msg)
-				targetAddr := net.UDPAddr{
-					IP:   w.MasterList[i].Addr.IP,
-					Port: masterListener,
-				}
-				util.UDPSend(&targetAddr, b)
-			}
-			log.Println("End sending all messages")
 		}
+		log.Println("End sending all messages")
 		//time.Sleep(time.Millisecond * 1000)
 	}
 
