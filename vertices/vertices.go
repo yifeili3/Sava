@@ -3,6 +3,7 @@ package vertices
 import (
 	"Sava/util"
 	"encoding/json"
+	"log"
 	"net"
 )
 
@@ -83,6 +84,7 @@ func (v *BaseVertex) SendMessageTo(destVertex int, msg util.WorkerMessage, MsgCh
 	n := destVertex % len(v.Partition)
 
 	receiverID := v.Partition[n].ID
+	log.Printf("Vex %d is sending message to worker %d,destVex %d\n", v.ID, receiverID, destVertex)
 	/*
 		if receiverID == v.WorkerID {
 			log.Println("Send to local")
@@ -98,7 +100,9 @@ func (v *BaseVertex) SendMessageTo(destVertex int, msg util.WorkerMessage, MsgCh
 
 func (v *BaseVertex) SendAllMessage() {
 	for i := 0; i < len(v.OutgoingMsg); i++ {
-		sendToRemote(v.OutgoingMsg[i].DestVertex, v.OutgoingMsg[i])
+		n := v.OutgoingMsg[i].DestVertex % len(v.Partition)
+		receiverID := v.Partition[n].ID
+		sendToRemote(receiverID, v.OutgoingMsg[i])
 	}
 }
 
@@ -112,6 +116,7 @@ func (v *BaseVertex) sendToQueue(receiVerID int, msg util.WorkerMessage) {
 
 func sendToRemote(receiverID int, msg util.WorkerMessage) {
 	// send over network
+	log.Printf("ReceiverID is %d, msg dest is %d", receiverID, msg.DestVertex)
 	m := util.Message{
 		MsgType:   "V2V",
 		WorkerMsg: msg,

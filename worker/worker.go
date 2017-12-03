@@ -241,7 +241,7 @@ func (w *Worker) WorkerTaskListener() {
 						v.EdgeList = append(v.EdgeList, vertices.Edge{DestVertex: destNode, EdgeValue: 1})
 					}
 				}
-				log.Printf("Number of vertices: %d\n", msg.NumVertex)
+				//log.Printf("Number of vertices: %d\n", msg.NumVertex)
 				switch msg.JobName {
 				case "PageRank":
 					prvMap := make(map[int]vertices.Vertex, len(baseVertices))
@@ -406,6 +406,6 @@ func (w *Worker) networkMessageReceiver(msg util.Message) {
 		//log.Println("Enqueue message")
 		v.EnqueueMessage(workerMsg)
 	} else {
-		log.Println("Network Vertex not existed")
+		//log.Println("Network Vertex not existed")
 	}
 }
