@@ -3,9 +3,7 @@ package vertices
 import (
 	"Sava/util"
 	"encoding/json"
-	"log"
 	"net"
-	"strconv"
 )
 
 const (
@@ -81,12 +79,9 @@ func (v *BaseVertex) GetOutEdgeList() *[]Edge {
 func (v *BaseVertex) SendMessageTo(destVertex int, msg util.WorkerMessage, MsgChan chan util.WorkerMessage) {
 	// check if remote/local
 	//log.Println("Sending vertex message from " + strconv.Itoa(v.ID) + "to " + strconv.Itoa(destVertex))
-	var receiverID int
-	for i := 0; i < len(v.Partition); i++ {
-		if v.Partition[i].StartNode <= destVertex && destVertex <= v.Partition[i].EndNode {
-			receiverID = v.Partition[i].ID
-		}
-	}
+	n := destVertex % len(v.Partition)
+
+	receiverID := v.Partition[n].ID
 	/*
 		if receiverID == v.WorkerID {
 			log.Println("Send to local")
@@ -96,6 +91,7 @@ func (v *BaseVertex) SendMessageTo(destVertex int, msg util.WorkerMessage, MsgCh
 		}
 	*/
 	sendToRemote(receiverID, msg)
+	//log.Printf("receiverID:%d\n", receiverID)
 }
 
 func sendToLocal(msg util.WorkerMessage, MsgChan chan util.WorkerMessage) {
@@ -136,19 +132,17 @@ func (v *BaseVertex) UpdateSuperstep(s int) {
 //EnqueueMessage ...
 func (v *BaseVertex) EnqueueMessage(in util.WorkerMessage) {
 	v.IncomingMsgNext = append(v.IncomingMsgNext, in)
+	//log.Println(len(v.IncomingMsgNext))
 }
 
 // UpdateMessageQueue ...need to update status of each vertex
 func (v *BaseVertex) UpdateMessageQueue() {
-	if len(v.IncomingMsgNext) == 0 {
-		return
-	}
 	// move message from S+1 to S
 	v.IncomingMsgCurrent = make([]util.WorkerMessage, len(v.IncomingMsgNext))
 	for i := 0; i < len(v.IncomingMsgNext); i++ {
 		// need deep copy????
 		v.IncomingMsgCurrent[i] = v.IncomingMsgNext[i]
-		log.Println("incoming message: " + strconv.FormatFloat(v.IncomingMsgCurrent[i].MessageValue.(float64), 'f', 6, 64))
+		//log.Println("incoming message from:" + strconv.FormatFloat(v.IncomingMsgCurrent[i].MessageValue.(float64), 'f', 6, 64))
 	}
 	v.IncomingMsgNext = nil
 	// vote to halt, but message comes in

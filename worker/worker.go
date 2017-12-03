@@ -168,7 +168,7 @@ func (w *Worker) WorkerMessageListener() {
 			}
 			switch msg.MsgType {
 			case "V2V": // Vertex message
-				log.Println("Receive Vertex Message")
+				//log.Println("Receive Vertex Message")
 				w.networkMessageReceiver(msg)
 			default:
 				log.Println("error")
@@ -228,6 +228,7 @@ func (w *Worker) WorkerTaskListener() {
 							ID:                 srcNode,
 							WorkerID:           w.ID,
 							SuperStep:          0,
+							CurrentValue:       1.0,
 							EdgeList:           make([]vertices.Edge, 0),
 							IncomingMsgCurrent: make([]util.WorkerMessage, 0),
 							IncomingMsgNext:    make([]util.WorkerMessage, 0),
@@ -274,7 +275,6 @@ func (w *Worker) WorkerTaskListener() {
 				}
 
 			case "SUPERSTEP": // Superstep msg
-				log.Println("Receive SuperStep Message")
 				SuperstepNum := msg.SuperStep
 				w.SuperStep = msg.SuperStep
 				w.MsgChan = make(chan util.WorkerMessage)
