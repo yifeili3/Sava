@@ -107,7 +107,7 @@ func sendToRemote(receiverID int, msg util.WorkerMessage) {
 	buf, _ := json.Marshal(m)
 	srcAddr := net.UDPAddr{
 		IP:   net.ParseIP(util.WhereAmI()),
-		Port: udpSender,
+		Port: 4005,
 	}
 	destAddr := net.UDPAddr{
 		IP:   net.ParseIP(util.CalculateIP(receiverID)),
