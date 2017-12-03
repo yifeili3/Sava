@@ -15,6 +15,8 @@ func main(){
 
     go Worker.HeartBeat()
     go Worker.HandleInput()
+    go Worker.WorkerMessageListener()
     Worker.WorkerTaskListener()
+    
     
 }

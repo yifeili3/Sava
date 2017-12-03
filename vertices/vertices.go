@@ -3,11 +3,12 @@ package vertices
 import (
 	"Sava/util"
 	"encoding/json"
+	"log"
 	"net"
+	"strconv"
 )
 
 const (
-	v2v            = "V2V"
 	udpSender      = 4000
 	workerListener = 4002
 )
@@ -79,17 +80,22 @@ func (v *BaseVertex) GetOutEdgeList() *[]Edge {
 //SendMessageTo ...
 func (v *BaseVertex) SendMessageTo(destVertex int, msg util.WorkerMessage, MsgChan chan util.WorkerMessage) {
 	// check if remote/local
+	//log.Println("Sending vertex message from " + strconv.Itoa(v.ID) + "to " + strconv.Itoa(destVertex))
 	var receiverID int
 	for i := 0; i < len(v.Partition); i++ {
 		if v.Partition[i].StartNode <= destVertex && destVertex <= v.Partition[i].EndNode {
 			receiverID = v.Partition[i].ID
 		}
 	}
-	if receiverID == v.WorkerID {
-		sendToLocal(msg, MsgChan)
-	} else {
-		sendToRemote(receiverID, msg)
-	}
+	/*
+		if receiverID == v.WorkerID {
+			log.Println("Send to local")
+			sendToLocal(msg, MsgChan)
+		} else {
+			sendToRemote(receiverID, msg)
+		}
+	*/
+	sendToRemote(receiverID, msg)
 }
 
 func sendToLocal(msg util.WorkerMessage, MsgChan chan util.WorkerMessage) {
@@ -99,19 +105,19 @@ func sendToLocal(msg util.WorkerMessage, MsgChan chan util.WorkerMessage) {
 func sendToRemote(receiverID int, msg util.WorkerMessage) {
 	// send over network
 	m := util.Message{
-		MsgType:   v2v,
+		MsgType:   "V2V",
 		WorkerMsg: msg,
 	}
 	buf, _ := json.Marshal(m)
-
 	srcAddr := net.UDPAddr{
 		IP:   net.ParseIP(util.WhereAmI()),
 		Port: udpSender,
 	}
 	destAddr := net.UDPAddr{
 		IP:   net.ParseIP(util.CalculateIP(receiverID)),
-		Port: workerListener,
+		Port: 4010,
 	}
+	//log.Println(destAddr.IP.String)
 	util.SendMessage(&srcAddr, &destAddr, buf)
 }
 
@@ -142,6 +148,7 @@ func (v *BaseVertex) UpdateMessageQueue() {
 	for i := 0; i < len(v.IncomingMsgNext); i++ {
 		// need deep copy????
 		v.IncomingMsgCurrent[i] = v.IncomingMsgNext[i]
+		log.Println("incoming message: " + strconv.FormatFloat(v.IncomingMsgCurrent[i].MessageValue.(float64), 'f', 6, 64))
 	}
 	v.IncomingMsgNext = nil
 	// vote to halt, but message comes in
@@ -149,11 +156,3 @@ func (v *BaseVertex) UpdateMessageQueue() {
 		v.IsActive = true
 	}
 }
-
-/*
-//MsgHandler ...
-func (v *Vertex) MsgHandler(msg util.WorkerMessage) {
-	// need to check superstep?
-	v.CurrentValue = msg.MessageValue
-}
-*/

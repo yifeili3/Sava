@@ -26,6 +26,7 @@ type Message struct {
 	Partition []MetaInfo
 	FileName  string
 	WorkerMsg WorkerMessage
+	NumVertex int
 }
 
 //WorkerMessage ...
