@@ -436,7 +436,7 @@ func (w *Worker) runSuperStep(Step int, MsgChan chan util.WorkerMessage) {
 	// sending a bag of []util.WorkerMessage to workers
 	for i := range messageQueue {
 		//log.Println("Yo where the Fuck")
-		if i < len(messageQueue/3) {
+		if i < len(messageQueue)/3 {
 			receiverID := w.Partition[i].ID
 			cmd := util.Message{
 				MsgType:       "W2W",
