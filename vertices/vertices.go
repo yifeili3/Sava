@@ -43,6 +43,7 @@ type Vertex interface {
 	EnqueueMessage(in util.WorkerMessage)
 	GetSuperStep() int
 	MutableValue(in interface{})
+	SendAllMessage()
 }
 
 //GetVertexID ...
@@ -90,12 +91,23 @@ func (v *BaseVertex) SendMessageTo(destVertex int, msg util.WorkerMessage, MsgCh
 			sendToRemote(receiverID, msg)
 		}
 	*/
-	sendToRemote(receiverID, msg)
+	//sendToRemote(receiverID, msg)
+	v.sendToQueue(receiverID, msg)
 	//log.Printf("receiverID:%d\n", receiverID)
+}
+
+func (v *BaseVertex) SendAllMessage() {
+	for i := 0; i < len(v.OutgoingMsg); i++ {
+		sendToRemote(v.OutgoingMsg[i].DestVertex, v.OutgoingMsg[i])
+	}
 }
 
 func sendToLocal(msg util.WorkerMessage, MsgChan chan util.WorkerMessage) {
 	MsgChan <- msg
+}
+
+func (v *BaseVertex) sendToQueue(receiVerID int, msg util.WorkerMessage) {
+	v.OutgoingMsg = append(v.OutgoingMsg, msg)
 }
 
 func sendToRemote(receiverID int, msg util.WorkerMessage) {
