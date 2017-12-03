@@ -372,12 +372,14 @@ func (w *Worker) runSuperStep(Step int, MsgChan chan util.WorkerMessage) {
 	for _ = range w.VertexMap {
 		<-doneChan
 	}
+	for _, v := range w.VertexMap {
+		v.SendAllMessage()
+	}
 }
 
 func superStep(Step int, v vertices.Vertex, doneChan chan bool, MsgChan chan util.WorkerMessage) {
 	v.UpdateSuperstep(Step)
 	v.Compute(Step, MsgChan)
-	v.SendAllMessage()
 	doneChan <- true
 }
 
