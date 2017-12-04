@@ -5,7 +5,6 @@ import (
 	"Sava/vertices"
 	"bufio"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net"
@@ -23,6 +22,7 @@ const (
 	workermsgListener = 4010
 	masterListener    = 4004
 	fileBase          = "/home/yifeili3/sava/"
+	tcpport           = 9339
 )
 
 type master struct {
@@ -32,16 +32,17 @@ type master struct {
 
 //Worker ...
 type Worker struct {
-	SuperStep  int
-	ID         int
-	VertexMap  map[int]vertices.Vertex
-	Filename   string
-	Connection []*net.UDPConn
-	Addr       net.UDPAddr
-	HasStart   bool
-	MasterList []master
-	MsgChan    chan util.WorkerMessage
-	Partition  []util.MetaInfo
+	SuperStep   int
+	ID          int
+	VertexMap   map[int]vertices.Vertex
+	Filename    string
+	Connection  []*net.UDPConn
+	Addr        net.UDPAddr
+	HasStart    bool
+	MasterList  []master
+	MsgChan     chan util.WorkerMessage
+	Partition   []util.MetaInfo
+	TCPListener net.Listener
 }
 
 //NewWorker ...
@@ -56,6 +57,11 @@ func NewWorker() (worker *Worker, err error) {
 	}
 
 	conn, err := net.ListenUDP("udp", &addr)
+	if err != nil {
+		log.Println(err)
+	}
+
+	l, err := net.Listen("tcp", ":"+strconv.Itoa(tcpport))
 	if err != nil {
 		log.Println(err)
 	}
@@ -79,6 +85,7 @@ func NewWorker() (worker *Worker, err error) {
 	}
 	worker.Connection[0] = conn
 	worker.Connection[1] = msgconn
+	worker.TCPListener = l
 
 	for i := 0; i < 2; i++ {
 		worker.MasterList[i] = master{
@@ -156,6 +163,77 @@ func (w *Worker) HeartBeat() {
 	}
 }
 
+func (w *Worker) WokerTCPListener() {
+	for {
+		c, err := w.TCPListener.Accept()
+		if err != nil {
+			log.Println(err)
+		}
+		go w.HandleTCPConn(c)
+
+		//time.Sleep(time.Millisecond * 1000)
+	}
+
+}
+
+func (w *Worker) HandleTCPConn(c net.Conn) {
+	defer c.Close()
+	var buf = make([]byte, 5000000)
+	count := 0
+	var n int
+	var err error
+	log.Println("Start to read from conn")
+	for {
+		n, err = c.Read(buf[count:])
+		if n != 0 {
+			//log.Printf("Read %d byte from tcp\n", n)
+		} else {
+			log.Println("Read finish")
+			break
+		}
+		count += n
+		if err != nil {
+			//log.Println(err)
+			log.Println("Read finish")
+			break
+		}
+	}
+
+	log.Println(count)
+	var msg util.Message
+	err = json.Unmarshal(buf[0:count], &msg)
+	if err != nil {
+		log.Println(err)
+	}
+	//remoteAddr := c.LocalAddr()
+	remoteAddr := c.RemoteAddr()
+
+	if msg.MsgType == "W2W" {
+		//log.Println("W2W")
+		w.PartWorkerMsg(msg)
+		for i := range w.MasterList {
+			msg := util.Message{
+				MsgType:   "W2WREV",
+				SuperStep: w.SuperStep,
+				TargetID:  util.CalculateID(remoteAddr.String()),
+			}
+			b, _ := json.Marshal(msg)
+			targetAddr := net.UDPAddr{
+				IP:   w.MasterList[i].Addr.IP,
+				Port: masterListener,
+			}
+			srcAddr := net.UDPAddr{
+				IP:   w.Addr.IP,
+				Port: 1995,
+			}
+			util.SendMessage(&srcAddr, &targetAddr, b)
+		}
+	} else {
+		log.Println("TCP receive some unrecognized msg")
+	}
+}
+
+/*
 func (w *Worker) WorkerMessageListener() {
 	buf := make([]byte, 15000000)
 	for {
@@ -196,15 +274,16 @@ func (w *Worker) WorkerMessageListener() {
 		}
 	}
 }
+*/
 
 func (w *Worker) PartWorkerMsg(msg util.Message) {
 	for i := range msg.PoolWorkerMsg {
 		workmsg := msg.PoolWorkerMsg[i]
 		// this is a list of metaInfos of a single vertex of that worker
 		if w.SuperStep == msg.SuperStep {
-			log.Printf("The pool message is %d %d %f\n ", workmsg.DestVertex, workmsg.MessageValue.(float64))
+			//log.Printf("The pool message is %d %d %f\n ", workmsg.DestVertex, workmsg.MessageValue.(float64))
 			if v, ok := w.VertexMap[workmsg.DestVertex]; ok {
-				log.Println("Enqueue message")
+				//log.Println("Enqueue message")
 				v.EnqueueMessage(workmsg)
 			} else {
 				log.Println("Network Vertex not existed")
@@ -219,9 +298,9 @@ func (w *Worker) WorkerTaskListener() {
 	buf := make([]byte, 8192)
 	for {
 		n, _, _ := w.Connection[0].ReadFromUDP(buf)
-		log.Printf("WokerTaskListener %d\n", n)
+		//log.Printf("WokerTaskListener %d\n", n)
 		if n != 0 {
-			log.Println("TaskListener in")
+			//log.Println("TaskListener in")
 			// process message
 			var msg util.Message
 			err := json.Unmarshal(buf[0:n], &msg)
@@ -339,8 +418,8 @@ func (w *Worker) WorkerTaskListener() {
 				}
 			case "JOBDONE":
 				//get output from vertices and rpc return file to master
-				w.writeToFile(fileBase + "result/" + strconv.Itoa(w.ID) + ".txt")
-				jobdone := util.Message{MsgType: "JOBDONE"}
+				arr := w.get25()
+				jobdone := util.Message{MsgType: "JOBDONE", Result: arr}
 				buf := util.FormatWorkerMessage(jobdone)
 				srcAddr := net.UDPAddr{IP: w.Addr.IP, Port: udpSender}
 				for i := 0; i < 2; i++ {
@@ -348,7 +427,6 @@ func (w *Worker) WorkerTaskListener() {
 					util.SendMessage(&srcAddr, &destAddr, buf)
 				}
 			}
-			log.Println("TaskListener out")
 		} else {
 			log.Println("TaskListener else")
 			continue
@@ -356,12 +434,7 @@ func (w *Worker) WorkerTaskListener() {
 	}
 }
 
-type sortarr []sortstruct
-
-type sortstruct struct {
-	key   int
-	value float64
-}
+type sortarr []util.Sortstruct
 
 func (s sortarr) Len() int {
 	return len(s)
@@ -371,24 +444,17 @@ func (s sortarr) Swap(i, j int) {
 }
 
 func (s sortarr) Less(i, j int) bool {
-	return s[i].value > s[j].value
+	return s[i].Value > s[j].Value
 }
 
-func (w *Worker) writeToFile(filename string) {
-	file, err := os.Create(filename)
-	if err != nil {
-		log.Println(err)
-	}
-	defer file.Close()
-	arr := make([]sortstruct, 0)
+func (w *Worker) get25() []util.Sortstruct {
+	arr := make([]util.Sortstruct, 0)
 
 	for _, v := range w.VertexMap {
-		arr = append(arr, sortstruct{key: v.GetVertexID(), value: v.GetValue().(float64)})
+		arr = append(arr, util.Sortstruct{Key: v.GetVertexID(), Value: v.GetValue().(float64)})
 	}
 	sort.Sort(sortarr(arr))
-	for i := 0; i < len(arr); i++ {
-		fmt.Fprintln(file, strconv.Itoa(arr[i].key)+"\t"+strconv.FormatFloat(arr[i].value, 'f', 6, 64))
-	}
+	return arr[0:25]
 }
 
 func (w *Worker) checkHalt() bool {
@@ -404,9 +470,12 @@ func (w *Worker) checkHalt() bool {
 
 func (w *Worker) runSuperStep(Step int, MsgChan chan util.WorkerMessage) {
 	log.Println("\nWork: Running superstep #:", Step)
+	updateChan := make(chan bool)
 	for _, v := range w.VertexMap {
-
-		v.UpdateMessageQueue()
+		go v.UpdateMessageQueue(updateChan)
+	}
+	for _ = range w.VertexMap {
+		<-updateChan
 	}
 	doneChan := make(chan bool)
 	for _, v := range w.VertexMap {
@@ -421,7 +490,7 @@ func (w *Worker) runSuperStep(Step int, MsgChan chan util.WorkerMessage) {
 	for _, v := range w.VertexMap {
 		messageQueue = *v.GetOutgoingMsg(messageQueue)
 	}
-	log.Println("Sending W2W")
+	//log.Println("Sending W2W")
 	// sending a bag of []util.WorkerMessage to workers
 	for i := range messageQueue {
 		//log.Println("Yo where the Fuck")
@@ -433,11 +502,27 @@ func (w *Worker) runSuperStep(Step int, MsgChan chan util.WorkerMessage) {
 		}
 		b, _ := json.Marshal(cmd)
 		log.Println(len(b))
-		targetAddr := net.UDPAddr{
-			IP:   net.ParseIP(util.CalculateIP(receiverID)),
-			Port: workermsgListener,
+		log.Println("begin dial...")
+		srcAddr := util.CalculateIP(receiverID) + ":" + strconv.Itoa(tcpport)
+		conn, err := net.Dial("tcp", srcAddr)
+		if err != nil {
+			log.Println(err)
 		}
-		util.UDPSend(&targetAddr, b)
+
+		conn.Write(b)
+		log.Println("TCP dial end.")
+		conn.Close()
+		/*
+			srcAddr := net.UDPAddr{
+				IP:   w.Addr.IP,
+				Port: 4003,
+			}
+			targetAddr := net.UDPAddr{
+				IP:   net.ParseIP(util.CalculateIP(receiverID)),
+				Port: workermsgListener,
+			}
+			util.SendMessage(&srcAddr, &targetAddr, b)
+		*/
 		//time.Sleep(time.Millisecond * 1000)
 		for i := range w.MasterList {
 			msg := util.Message{
@@ -446,13 +531,17 @@ func (w *Worker) runSuperStep(Step int, MsgChan chan util.WorkerMessage) {
 				TargetID:  receiverID,
 			}
 			b, _ := json.Marshal(msg)
+			srcAddr := net.UDPAddr{
+				IP:   w.Addr.IP,
+				Port: 4001,
+			}
 			targetAddr := net.UDPAddr{
 				IP:   w.MasterList[i].Addr.IP,
 				Port: masterListener,
 			}
-			util.UDPSend(&targetAddr, b)
+			util.SendMessage(&srcAddr, &targetAddr, b)
 		}
-		log.Println("End sending all messages")
+		//log.Println("End sending all messages")
 		//time.Sleep(time.Millisecond * 1000)
 	}
 

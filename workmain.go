@@ -15,9 +15,10 @@ func main(){
 
     
     go Worker.HandleInput()
-    go Worker.WorkerMessageListener()
+    //go Worker.WorkerMessageListener()
     go Worker.WorkerTaskListener()
-    Worker.HeartBeat()
+    go Worker.HeartBeat()
+    Worker.WokerTCPListener()
     
     
 }

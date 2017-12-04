@@ -16,6 +16,7 @@ const (
 	masterRPCport = ":9876"
 	udpport       = 4000
 	baseFilepath  = "/home/yifeili3/sava/"
+	tcpport       = 9339
 )
 
 // Message ...
@@ -29,6 +30,11 @@ type Message struct {
 	PoolWorkerMsg []WorkerMessage
 	NumVertex     int
 	TargetID      int
+	Result        []Sortstruct
+}
+type Sortstruct struct {
+	Key   int
+	Value float64
 }
 
 //WorkerMessage ...

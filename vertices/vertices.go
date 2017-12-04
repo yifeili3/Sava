@@ -26,6 +26,8 @@ type BaseVertex struct {
 	Partition          []util.MetaInfo
 	IsActive           bool
 	mux                sync.Mutex
+	muxIncomingNext    sync.Mutex
+	muxIncomingCurr    sync.Mutex
 }
 
 //Edge ...
@@ -40,7 +42,7 @@ type Vertex interface {
 	GetVertexID() int
 	GetValue() interface{}
 	GetOutEdgeList() *[]Edge
-	UpdateMessageQueue()
+	UpdateMessageQueue(updateChan chan bool)
 	UpdateSuperstep(s int)
 	GetActive() bool
 	EnqueueMessage(in util.WorkerMessage)
@@ -52,7 +54,7 @@ type Vertex interface {
 
 // GetOutgoingMsg ...
 func (v *BaseVertex) GetOutgoingMsg(outMsg [][]util.WorkerMessage) *[][]util.WorkerMessage {
-	for i := 0; i < len(v.OutgoingMsg)/5; i++ {
+	for i := 0; i < len(v.OutgoingMsg); i++ {
 		if v.OutgoingMsg[i].SuperStep != v.SuperStep {
 			continue
 		}
@@ -173,12 +175,14 @@ func (v *BaseVertex) UpdateSuperstep(s int) {
 //EnqueueMessage ...
 func (v *BaseVertex) EnqueueMessage(in util.WorkerMessage) {
 	//log.Println("get incoming message value:%f\n", in.MessageValue)
+	//v.muxIncomingNext.Lock()
 	v.IncomingMsgNext = append(v.IncomingMsgNext, in)
+	//v.muxIncomingNext.Unlock()
 	//log.Printf("length of incomingMsgNext is %d\n", len(v.IncomingMsgNext))
 }
 
 // UpdateMessageQueue ...need to update status of each vertex
-func (v *BaseVertex) UpdateMessageQueue() {
+func (v *BaseVertex) UpdateMessageQueue(updateChan chan bool) {
 	//log.Println("Print incomingmsgCurrent")
 
 	// move message from S+1 to S
@@ -186,7 +190,9 @@ func (v *BaseVertex) UpdateMessageQueue() {
 	for i := 0; i < len(v.IncomingMsgNext); i++ {
 		// need deep copy????
 		if v.SuperStep == v.IncomingMsgNext[i].SuperStep {
+			//v.muxIncomingNext.Lock()
 			v.IncomingMsgCurrent = append(v.IncomingMsgCurrent, v.IncomingMsgNext[i])
+			//v.muxIncomingNext.Unlock()
 			//log.Println("incoming message from:" + strconv.FormatFloat(v.IncomingMsgCurrent[i].MessageValue.(float64), 'f', 6, 64))
 		}
 
@@ -197,4 +203,5 @@ func (v *BaseVertex) UpdateMessageQueue() {
 		log.Println("Should stop at 2")
 		v.IsActive = true
 	}
+	updateChan <- true
 }
