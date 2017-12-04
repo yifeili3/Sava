@@ -7,6 +7,6 @@ go build -o ../../pkg/util.a ./util/
 mkdir /home/yifeili3/sava/result/
 mkdir /home/yifeili3/sava/data/
 
-RUNJOB PageRank /home/yifeili3/com-amazon.ungraph.txt
+RUNJOB PageRank /home/yifeili3/sava/data/com-amazon.ungraph.txt
 RUNJOB PageRank /home/yifeili3/sava/data/graph.txt
 RUNJOB PageRank /home/yifeili3/sava/data/2node.txt
