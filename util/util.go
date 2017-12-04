@@ -53,6 +53,7 @@ type MetaInfo struct {
 	EndNode   int
 	State     int
 	Halt      bool
+	SSdone    bool
 }
 
 //ClientMsg ...
