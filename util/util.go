@@ -31,6 +31,7 @@ type Message struct {
 	NumVertex     int
 	TargetID      int
 	Result        []Sortstruct
+	SourceID      string
 }
 type Sortstruct struct {
 	Key   int
@@ -123,8 +124,8 @@ func SendMessage(srcAddr *net.UDPAddr, dstAddr *net.UDPAddr, info []byte) {
 	if err != nil {
 		fmt.Println(err)
 	}
-	defer conn.Close()
 	conn.Write(info)
+	conn.Close()
 }
 
 //RPCPutFile ...put file to master
@@ -156,8 +157,8 @@ func RPCPutFile(targetID int, localFileName string, filetype string) {
 }
 
 //FormatMessage ...
-func FormatMessage(jobName string, filename string) []byte {
-	data := Message{JobName: jobName, FileName: filename[strings.LastIndex(filename, "/"):], MsgType: "Job"}
+func FormatMessage(jobName string, filename string, sourceID string) []byte {
+	data := Message{JobName: jobName, FileName: filename[strings.LastIndex(filename, "/"):], MsgType: "Job", SourceID: sourceID}
 	b, _ := json.Marshal(data)
 	return b
 }

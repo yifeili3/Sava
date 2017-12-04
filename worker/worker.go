@@ -5,6 +5,7 @@ import (
 	"Sava/vertices"
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net"
@@ -111,7 +112,16 @@ func (w *Worker) HandleInput() {
 		case "RUNJOB":
 			jobName := cmd[1]
 			dataFile := cmd[2]
-			w.RequestJob(jobName, dataFile)
+			if jobName == "PageRank" {
+				w.RequestJob(jobName, dataFile, "")
+			} else if jobName == "SSSP" {
+				sourceID := cmd[3]
+				w.RequestJob(jobName, dataFile, sourceID)
+
+			} else {
+				log.Println("Wrong job, plz try again")
+			}
+
 		default:
 			continue
 		}
@@ -129,13 +139,13 @@ func (w *Worker) join() {
 }
 
 //RequestJob ...
-func (w *Worker) RequestJob(jobName string, filePath string) {
+func (w *Worker) RequestJob(jobName string, filePath string, sourceID string) {
 	for i := range w.MasterList {
 		MasterID := w.MasterList[i].ID
 		//util.RPCPutFile(MasterID, jobName, "job")
 		util.RPCPutFile(MasterID, filePath, "data")
 		// send message to master and ask to start job
-		b := util.FormatMessage(jobName, filePath)
+		b := util.FormatMessage(jobName, filePath, sourceID)
 		targetAddr := net.UDPAddr{
 			IP:   net.ParseIP(util.CalculateIP(MasterID)),
 			Port: masterListener,
@@ -178,23 +188,23 @@ func (w *Worker) WokerTCPListener() {
 
 func (w *Worker) HandleTCPConn(c net.Conn) {
 	defer c.Close()
-	var buf = make([]byte, 5000000)
+	var buf = make([]byte, 10000000)
 	count := 0
 	var n int
 	var err error
-	log.Println("Start to read from conn")
+	//log.Println("Start to read from conn")
 	for {
 		n, err = c.Read(buf[count:])
 		if n != 0 {
 			//log.Printf("Read %d byte from tcp\n", n)
 		} else {
-			log.Println("Read finish")
+			//log.Println("Read finish")
 			break
 		}
 		count += n
 		if err != nil {
 			//log.Println(err)
-			log.Println("Read finish")
+			//log.Println("Read finish")
 			break
 		}
 	}
@@ -338,7 +348,7 @@ func (w *Worker) WorkerTaskListener() {
 					destNode, _ := strconv.Atoi(dest)
 
 					if v, ok := baseVertices[srcNode]; ok {
-						v.EdgeList = append(v.EdgeList, vertices.Edge{DestVertex: destNode, EdgeValue: 1})
+						v.EdgeList = append(v.EdgeList, vertices.Edge{DestVertex: destNode, EdgeValue: 1.0})
 					} else {
 						baseVertices[srcNode] = &vertices.BaseVertex{
 							ID:                 srcNode,
@@ -354,7 +364,7 @@ func (w *Worker) WorkerTaskListener() {
 						}
 						v := baseVertices[srcNode]
 						v.Partition = msg.Partition
-						v.EdgeList = append(v.EdgeList, vertices.Edge{DestVertex: destNode, EdgeValue: 1})
+						v.EdgeList = append(v.EdgeList, vertices.Edge{DestVertex: destNode, EdgeValue: 1.0})
 					}
 				}
 				//log.Printf("Number of vertices: %d\n", msg.NumVertex)
@@ -369,11 +379,12 @@ func (w *Worker) WorkerTaskListener() {
 					}
 					w.VertexMap = prvMap
 				case "SSSP":
+					sourceID, _ := strconv.Atoi(msg.SourceID)
 					ssspMap := make(map[int]vertices.Vertex, len(baseVertices))
 					for id, baseVertex := range baseVertices {
 						ssspMap[id] = &vertices.SSSPVertex{
 							BaseVertex: *baseVertex,
-							Source:     msg.NumVertex,
+							Source:     sourceID,
 						}
 					}
 					w.VertexMap = ssspMap
@@ -469,6 +480,14 @@ func (w *Worker) checkHalt() bool {
 }
 
 func (w *Worker) runSuperStep(Step int, MsgChan chan util.WorkerMessage) {
+	defer func() {
+		if err := recover(); err != nil {
+			// Handle our error.
+			fmt.Println("FIX")
+			fmt.Println("ERR", err)
+		}
+	}()
+
 	log.Println("\nWork: Running superstep #:", Step)
 	updateChan := make(chan bool)
 	for _, v := range w.VertexMap {
@@ -501,8 +520,8 @@ func (w *Worker) runSuperStep(Step int, MsgChan chan util.WorkerMessage) {
 			SuperStep:     w.SuperStep,
 		}
 		b, _ := json.Marshal(cmd)
-		log.Println(len(b))
-		log.Println("begin dial...")
+		//log.Println(len(b))
+		//log.Println("begin dial...")
 		srcAddr := util.CalculateIP(receiverID) + ":" + strconv.Itoa(tcpport)
 		conn, err := net.Dial("tcp", srcAddr)
 		if err != nil {
@@ -510,7 +529,7 @@ func (w *Worker) runSuperStep(Step int, MsgChan chan util.WorkerMessage) {
 		}
 
 		conn.Write(b)
-		log.Println("TCP dial end.")
+		//log.Println("TCP dial end.")
 		conn.Close()
 		/*
 			srcAddr := net.UDPAddr{

@@ -14,25 +14,25 @@ type SSSPVertex struct {
 // Compute ...
 func (sssp *SSSPVertex) Compute(Step int, MsgChan chan util.WorkerMessage) {
 	sssp.SuperStep = Step
-	var mindist int
+	var mindist float64
 	if sssp.isSource(sssp.ID) {
-		mindist = 0
+		mindist = 0.0
 	} else {
-		mindist = math.MaxInt32
+		mindist = math.MaxFloat64
 	}
 	for _, msg := range sssp.IncomingMsgCurrent {
-		if mindist > msg.MessageValue.(int) {
-			mindist = msg.MessageValue.(int)
+		if mindist > msg.MessageValue.(float64) {
+			mindist = msg.MessageValue.(float64)
 		}
 	}
-	if mindist < sssp.CurrentValue.(int) {
+	if mindist < sssp.CurrentValue.(float64) {
 		sssp.CurrentValue = mindist
 	}
 
 	for _, edge := range sssp.EdgeList {
 		msg := util.WorkerMessage{
 			DestVertex:   edge.DestVertex,
-			MessageValue: mindist + edge.EdgeValue.(int),
+			MessageValue: mindist + edge.EdgeValue.(float64),
 			SuperStep:    Step,
 		}
 		sssp.SendMessageTo(edge.DestVertex, msg, MsgChan)
