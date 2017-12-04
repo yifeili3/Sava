@@ -313,12 +313,12 @@ func (m *Master) updateSuperStep(workerAddr *net.UDPAddr, ret util.Message) {
 		}
 	}
 
-	log.Printf("Master receive %d that he's sending m to %d, superstep m %d, w %d\n", id, receiveID, m.SuperStep, ret.SuperStep)
+	//log.Printf("Master receive %d that he's sending m to %d, superstep m %d, w %d\n", id, receiveID, m.SuperStep, ret.SuperStep)
 	if m.SuperStep == ret.SuperStep {
 		m.Mux.Lock()
 		m.WaitMsg[x][y] -= 1
 		m.WWCount++
-		log.Println(m.WWCount)
+		//log.Println(m.WWCount)
 		m.Mux.Unlock()
 	}
 
@@ -347,7 +347,7 @@ func (m *Master) startNextSupterStep(workerAddr *net.UDPAddr, ret util.Message) 
 
 	receiveID := util.CalculateID(workerAddr.IP.String())
 	id := ret.TargetID
-	log.Printf("Master receive %d that %d's message has sent to him, superstep m %d, w %d\n", receiveID, id, m.SuperStep, ret.SuperStep)
+	//log.Printf("Master receive %d that %d's message has sent to him, superstep m %d, w %d\n", receiveID, id, m.SuperStep, ret.SuperStep)
 	for i := range m.Partition {
 		if m.Partition[i].ID == id {
 			x = i
@@ -361,7 +361,7 @@ func (m *Master) startNextSupterStep(workerAddr *net.UDPAddr, ret util.Message) 
 		m.Mux.Lock()
 		m.WaitMsg[x][y] += 1
 		m.WWCount++
-		log.Println(m.WWCount)
+		//log.Println(m.WWCount)
 		m.Mux.Unlock()
 	}
 	size := len(m.Partition)
