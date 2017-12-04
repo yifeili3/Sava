@@ -236,7 +236,7 @@ func (w *Worker) HandleTCPConn(c net.Conn) {
 				IP:   w.Addr.IP,
 				Port: 1995,
 			}
-			time.Sleep(time.Millisecond*5)
+			time.Sleep(time.Millisecond*30)
 			util.SendMessage(&srcAddr, &targetAddr, b)
 		}
 	} else {
