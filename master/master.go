@@ -21,6 +21,7 @@ const (
 	baseFilepath    = "/home/yifeili3/sava/"
 	threshold       = 200
 	masterthreshold = 40
+	udpSender       = 8524
 )
 
 // what master is doing
@@ -193,12 +194,24 @@ func (m *Master) UpdateMemberShip() {
 func (m *Master) intergrateFile() {
 
 	sort.Sort(sortarr(m.Result))
+	ret := make([]util.Sortstruct, 0)
 	for i := range m.Result {
+		ret = append(ret, m.Result[i])
 		if i >= 25 {
 			break
 		}
 		log.Printf("%d\t%f", m.Result[i].Key, m.Result[i].Value)
 	}
+	// send the result back to client
+	jobdone := util.Message{MsgType: "RESULT", Result: ret}
+	buf := util.FormatWorkerMessage(jobdone)
+	srcAddr := net.UDPAddr{IP: m.Addr.IP, Port: udpSender}
+
+	destAddr := net.UDPAddr{
+		IP:   net.ParseIP(util.CalculateIP(m.ClientID)),
+		Port: udpport,
+	}
+	util.SendMessage(&srcAddr, &destAddr, buf)
 
 	// intergrate the result file into one file and send it back to client
 	/*
@@ -236,6 +249,7 @@ func (m *Master) intergrateFile() {
 		util.RPCPutFile(m.ClientID, foName, "result")
 	*/
 	log.Println("transmit result to client done, job done.")
+	os.Exit(0)
 
 }
 

@@ -188,7 +188,7 @@ func (w *Worker) WokerTCPListener() {
 
 func (w *Worker) HandleTCPConn(c net.Conn) {
 	defer c.Close()
-	var buf = make([]byte, 10000000)
+	var buf = make([]byte, 12000000)
 	count := 0
 	var n int
 	var err error
@@ -236,7 +236,7 @@ func (w *Worker) HandleTCPConn(c net.Conn) {
 				IP:   w.Addr.IP,
 				Port: 1995,
 			}
-			time.Sleep(time.Millisecond*30)
+			time.Sleep(time.Millisecond * 30)
 			util.SendMessage(&srcAddr, &targetAddr, b)
 		}
 	} else {
@@ -438,6 +438,13 @@ func (w *Worker) WorkerTaskListener() {
 					destAddr := w.MasterList[i].Addr
 					util.SendMessage(&srcAddr, &destAddr, buf)
 				}
+				os.Exit(0)
+			case "RESULT":
+				log.Println("Get the result from master, job done. Result:")
+				for i := range msg.Result {
+					log.Printf("%d\t%f", msg.Result[i].Key, msg.Result[i].Value)
+				}
+				os.Exit(0)
 			}
 		} else {
 			log.Println("TaskListener else")
