@@ -29,7 +29,7 @@ func (prv *PageRankVertex) Compute(Step int, MsgCHan chan util.WorkerMessage) {
 		//log.Printf("V%d: Sum: %f,CurrentValue: %f, outgoingPageRank:  %f", prv.ID, sum, prv.CurrentValue.(float64), outgoingPageRank)
 	}
 
-	if prv.SuperStep <= 30 {
+	if prv.SuperStep <= 20 {
 		for _, edge := range prv.EdgeList {
 			msg := util.WorkerMessage{
 				DestVertex:   edge.DestVertex,

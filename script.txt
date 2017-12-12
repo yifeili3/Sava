@@ -10,3 +10,10 @@ mkdir /home/yifeili3/sava/data/
 RUNJOB PageRank /home/yifeili3/sava/data/com-amazon.ungraph.txt
 RUNJOB PageRank /home/yifeili3/sava/data/graph.txt
 RUNJOB PageRank /home/yifeili3/sava/data/2node.txt
+
+bash script.sh
+go run workmain.go
+
+bash script.sh
+go run mastermain.go
+
